@@ -9,8 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Edit, Trash2, Download, Loader2, FileText, ArrowUpDown } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Edit, Trash2, Download, Loader2, FileText, ArrowUpDown, Package } from 'lucide-react'
 import { Database } from '@/lib/supabase'
+import JSZip from 'jszip'
 
 type CompletedConsent = Database['public']['Tables']['completed_consents']['Row'] & {
   templates: {
@@ -29,6 +31,8 @@ export function CompletedConsentsTab() {
   const [deleteConsent, setDeleteConsent] = useState<CompletedConsent | null>(null)
   const [sortBy, setSortBy] = useState<SortOption>('date-desc')
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [selectedConsents, setSelectedConsents] = useState<string[]>([])
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false)
   const supabase = createClient()
 
   const fetchConsents = useCallback(async () => {
@@ -186,6 +190,65 @@ export function CompletedConsentsTab() {
     }
   }
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedConsents(consents.map((c) => c.id))
+    } else {
+      setSelectedConsents([])
+    }
+  }
+
+  const handleSelectOne = (consentId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedConsents((prev) => [...prev, consentId])
+    } else {
+      setSelectedConsents((prev) => prev.filter((id) => id !== consentId))
+    }
+  }
+
+  const handleDownloadSelected = async () => {
+    if (selectedConsents.length === 0) return
+
+    setIsDownloadingZip(true)
+    setError(null)
+    try {
+      const zip = new JSZip()
+      const consentsToDownload = consents.filter((c) => selectedConsents.includes(c.id))
+
+      for (const consent of consentsToDownload) {
+        if (consent.file_path) {
+          const { data, error } = await supabase.storage
+            .from('completed-consents')
+            .download(consent.file_path)
+
+          if (error) {
+            throw new Error(`Chyba při stahování souboru pro ${consent.name}: ${error.message}`)
+          }
+
+          if (data) {
+            const fileExtension = consent.file_path.endsWith('.png') ? '.png' : '.pdf'
+            zip.file(`${consent.name}${fileExtension}`, data)
+          }
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(zipBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'souhlasy.zip'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Chyba při vytváření ZIP archivu')
+      console.error(err)
+    } finally {
+      setIsDownloadingZip(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -197,25 +260,32 @@ export function CompletedConsentsTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Vyplněné souhlasy</h2>
-          <p className="text-muted-foreground">
-            Přehled všech vyplněných a čekających souhlasů
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="date-desc">Nejnovější první</SelectItem>
-              <SelectItem value="date-asc">Nejstarší první</SelectItem>
-              <SelectItem value="name-asc">Podle názvu A-Z</SelectItem>
-              <SelectItem value="name-desc">Podle názvu Z-A</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center space-x-4">
+          <div>
+            <Label htmlFor="sort-by">Seřadit podle</Label>
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+              <SelectTrigger id="sort-by" className="w-[180px]">
+                <SelectValue placeholder="Seřadit podle..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date-desc">Datum (nejnovější)</SelectItem>
+                <SelectItem value="date-asc">Datum (nejstarší)</SelectItem>
+                <SelectItem value="name-asc">Jméno (A-Z)</SelectItem>
+                <SelectItem value="name-desc">Jméno (Z-A)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={handleDownloadSelected}
+            disabled={selectedConsents.length === 0 || isDownloadingZip}
+          >
+            {isDownloadingZip ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Package className="mr-2 h-4 w-4" />
+            )}
+            Stáhnout vybrané ({selectedConsents.length})
+          </Button>
         </div>
       </div>
 
@@ -225,124 +295,126 @@ export function CompletedConsentsTab() {
         </Alert>
       )}
 
-      {consents.length === 0 ? (
-        <div className="text-center py-8">
-          <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-2 text-sm font-semibold">Žádné souhlasy</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Vyplněné souhlasy se zobrazí zde po jejich dokončení
-          </p>
-        </div>
-      ) : (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Název</TableHead>
-                <TableHead>Šablona</TableHead>
-                <TableHead>Stav</TableHead>
-                <TableHead>Datum vytvoření</TableHead>
-                <TableHead>Datum dokončení</TableHead>
-                <TableHead className="text-right">Akce</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {consents.map((consent) => (
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[50px]">
+                <Checkbox
+                  checked={selectedConsents.length === consents.length && consents.length > 0}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
+              <TableHead>Jméno</TableHead>
+              <TableHead>Šablona</TableHead>
+              <TableHead>Stav</TableHead>
+              <TableHead>Datum dokončení</TableHead>
+              <TableHead>Akce</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {consents.length > 0 ? (
+              consents.map((consent) => (
                 <TableRow key={consent.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedConsents.includes(consent.id)}
+                      onCheckedChange={(checked) => handleSelectOne(consent.id, !!checked)}
+                      aria-label={`Select consent ${consent.name}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{consent.name}</TableCell>
-                  <TableCell>{consent.templates?.name || 'Neznámá šablona'}</TableCell>
+                  <TableCell>{consent.templates?.name || 'N/A'}</TableCell>
                   <TableCell>{getStatusBadge(consent.status, consent.completed_at)}</TableCell>
-                  <TableCell>{formatDate(consent.created_at)}</TableCell>
                   <TableCell>{formatDate(consent.completed_at)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {consent.status === 'completed' && consent.file_path && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDownload(consent)}
-                          disabled={downloading === consent.id}
-                        >
-                          {downloading === consent.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Download className="h-4 w-4" />
-                          )}
-                        </Button>
-                      )}
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
                       <Button
-                        variant="ghost"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(consent)}
+                        disabled={!consent.file_path || downloading === consent.id}
+                      >
+                        {downloading === consent.id ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="mr-2 h-4 w-4" />
+                        )}
+                        Stáhnout
+                      </Button>
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => {
                           setEditingConsent(consent)
                           setEditName(consent.name)
                         }}
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="mr-2 h-4 w-4" />
+                        Upravit
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="destructive"
                         size="sm"
                         onClick={() => setDeleteConsent(consent)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Smazat
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center">
+                  Žádné dokončené souhlasy.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-      {/* Edit Consent Dialog */}
+      {/* Edit Dialog */}
       <Dialog open={!!editingConsent} onOpenChange={() => setEditingConsent(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Upravit souhlas</DialogTitle>
-            <DialogDescription>
-              Změňte název souhlasu
-            </DialogDescription>
+            <DialogTitle>Upravit jméno souhlasu</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="consent-name">Název souhlasu</Label>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Jméno
+              </Label>
               <Input
-                id="consent-name"
+                id="name"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                placeholder="Zadejte název souhlasu"
+                className="col-span-3"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingConsent(null)}>
-              Zrušit
-            </Button>
-            <Button onClick={handleEditConsent}>
-              Uložit změny
-            </Button>
+            <Button variant="outline" onClick={() => setEditingConsent(null)}>Zrušit</Button>
+            <Button onClick={handleEditConsent}>Uložit změny</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Consent Dialog */}
+      {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteConsent} onOpenChange={() => setDeleteConsent(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Smazat souhlas</DialogTitle>
+            <DialogTitle>Opravdu smazat souhlas?</DialogTitle>
             <DialogDescription>
-              Opravdu chcete smazat souhlas "{deleteConsent?.name}"? Tato akce je nevratná.
+              Tato akce je nevratná. Souhlas bude trvale smazán.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConsent(null)}>
-              Zrušit
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteConsent}>
-              Smazat
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteConsent(null)}>Zrušit</Button>
+            <Button variant="destructive" onClick={handleDeleteConsent}>Smazat</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
