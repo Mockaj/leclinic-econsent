@@ -34,7 +34,7 @@ export default function LoginPage() {
       } else {
         router.push('/dashboard')
       }
-    } catch (err) {
+    } catch (err: unknown) {
       setError('Došlo k neočekávané chybě')
     } finally {
       setLoading(false)

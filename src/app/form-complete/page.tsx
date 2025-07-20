@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,7 +32,7 @@ export default function FormCompletePage() {
             // Generic mobile fallback
             alert('Otevřete aplikaci fotoaparátu ve vašem telefonu a naskenujte QR kód.')
           }
-        } catch (mobileErr) {
+        } catch (_mobileErr) {
           throw new Error('Nepodařilo se otevřít aplikaci kamery')
         }
       } else {
@@ -57,17 +57,20 @@ export default function FormCompletePage() {
         alert('Kamera je dostupná. Použijte QR čtečku nebo aplikaci kamery k naskenovanie QR kódu.')
       }
       
-    } catch (err: any) {
-      console.error('Camera error:', err)
-      let errorMessage = `Chyba při aktivaci kamery: ${err.message}`
-      
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Přístup ke kameře byl odepren. Povolte přístup v nastavení prohlížeče.'
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'Kamera nebyla nalezena. Zkontrolujte, zda je kamera připojena.'
+    } catch (err: unknown) {
+      console.error('Camera error:', err);
+      let errorMessage = 'Chyba při aktivaci kamery.';
+
+      if (err instanceof Error) {
+        errorMessage = `Chyba při aktivaci kamery: ${err.message}`;
+        if (err.name === 'NotAllowedError') {
+          errorMessage = 'Přístup ke kameře byl odepřen. Povolte přístup v nastavení prohlížeče.';
+        } else if (err.name === 'NotFoundError') {
+          errorMessage = 'Kamera nebyla nalezena. Zkontrolujte, zda je kamera připojena.';
+        }
       }
       
-      setCameraError(errorMessage)
+      setCameraError(errorMessage);
     } finally {
       setIsScanning(false)
     }

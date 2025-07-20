@@ -66,9 +66,13 @@ export function QRCodeModal({ template, onClose, onSuccess }: QRCodeModalProps) 
       setQrUrl(fillUrl)
       setStep('qr')
       onSuccess()
-    } catch (err) {
-      setError('Chyba při vytváření QR kódu')
-      console.error(err)
+    } catch (err: unknown) {
+      console.error('QR Code Generation Error:', err);
+      if (err instanceof Error) {
+        setError(`Chyba při vytváření QR kódu: ${err.message}`);
+      } else {
+        setError('Chyba při vytváření QR kódu: Vyskytla se neznámá chyba.');
+      }
     } finally {
       setLoading(false)
     }

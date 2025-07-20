@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import { Button } from '@/components/ui/button'
@@ -28,13 +28,8 @@ export default function ConsentFillPage() {
   const [completed, setCompleted] = useState(false)
   const supabase = createClient()
 
-  useEffect(() => {
-    if (token) {
-      loadConsent()
-    }
-  }, [token])
-
-  const loadConsent = async () => {
+  const loadConsent = useCallback(async () => {
+    setLoading(true);
     try {
       // Find consent record by token
       const { data: consentData, error: consentError } = await supabase
@@ -47,63 +42,62 @@ export default function ConsentFillPage() {
           )
         `)
         .eq('auth_token', token)
-        .single()
+        .single();
 
       if (consentError) {
         if (consentError.code === 'PGRST116') {
-          setError('Odkaz není platný nebo již byl použit.')
+          throw new Error('Odkaz není platný nebo již byl použit.');
         } else {
-          throw consentError
+          throw consentError;
         }
-        return
       }
 
       if (!consentData) {
-        setError('Formulář nebyl nalezen.')
-        return
+        throw new Error('Formulář nebyl nalezen.');
       }
 
+      // Check if consent is already completed
       if (consentData.status === 'completed') {
-        setError('Tento formulář již byl vyplněn.')
-        return
+        setCompleted(true);
+        return;
       }
 
-      if (!consentData.templates) {
-        setError('Šablona formuláře nebyla nalezena.')
-        return
+      setConsent(consentData as ConsentRecord);
+
+      // Get public URL for the template file
+      if (consentData.templates?.file_path) {
+        const { data: urlData } = supabase.storage
+          .from('templates')
+          .getPublicUrl(consentData.templates.file_path);
+        
+        setPdfUrl(urlData.publicUrl);
       }
-
-      setConsent(consentData as ConsentRecord)
-
-      // Get signed URL for PDF template
-      const { data: urlData, error: urlError } = await supabase.storage
-        .from('consent-templates')
-        .createSignedUrl(consentData.templates.file_path, 3600) // 1 hour expiry
-
-      if (urlError) throw urlError
-
-      setPdfUrl(urlData.signedUrl)
-    } catch (err) {
-      setError('Chyba při načítání formuláře.')
-      console.error(err)
+    } catch (err: any) {
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  }, [supabase, token]);
+
+  useEffect(() => {
+    if (token) {
+      loadConsent();
+    }
+  }, [token, loadConsent]);
 
   const handleSaveForm = async (annotatedPdfBlob: Blob) => {
     if (!consent) return
 
     setSaving(true)
     try {
-      // Upload the annotated PDF to storage
-      const fileName = `${consent.id}-${Date.now()}.pdf`
+      // Upload the annotated form to storage (as PNG image)
+      const fileName = `${consent.id}-${Date.now()}.png`
       const filePath = `completed/${fileName}`
 
       const { error: uploadError } = await supabase.storage
         .from('completed-consents')
         .upload(filePath, annotatedPdfBlob, {
-          contentType: 'application/pdf'
+          contentType: 'image/png'
         })
 
       if (uploadError) throw uploadError

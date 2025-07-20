@@ -38,9 +38,13 @@ export function TemplatesTab() {
 
       if (error) throw error
       setTemplates(data || [])
-    } catch (err) {
-      setError('Chyba při načítání šablon')
-      console.error(err)
+    } catch (err: unknown) {
+      console.error('Fetch Templates Error:', err);
+      if (err instanceof Error) {
+        setError(`Chyba při načítání šablon: ${err.message}`);
+      } else {
+        setError('Chyba při načítání šablon: Vyskytla se neznámá chyba.');
+      }
     } finally {
       setLoading(false)
     }
@@ -91,9 +95,13 @@ export function TemplatesTab() {
       }
 
       await fetchTemplates()
-    } catch (err) {
-      setError('Chyba při nahrávání souboru')
-      console.error(err)
+    } catch (err: unknown) {
+      console.error('File Upload Error:', err);
+      if (err instanceof Error) {
+        setError(`Chyba při nahrávání souboru: ${err.message}`);
+      } else {
+        setError('Chyba při nahrávání souboru: Vyskytla se neznámá chyba.');
+      }
     } finally {
       setUploading(false)
       // Reset file input
@@ -115,9 +123,13 @@ export function TemplatesTab() {
       await fetchTemplates()
       setEditingTemplate(null)
       setEditName('')
-    } catch (err) {
-      setError('Chyba při úpravě šablony')
-      console.error(err)
+    } catch (err: unknown) {
+      console.error('Edit Template Error:', err);
+      if (err instanceof Error) {
+        setError(`Chyba při úpravě šablony: ${err.message}`);
+      } else {
+        setError('Chyba při úpravě šablony: Vyskytla se neznámá chyba.');
+      }
     }
   }
 
@@ -142,9 +154,13 @@ export function TemplatesTab() {
 
       await fetchTemplates()
       setDeleteTemplate(null)
-    } catch (err) {
-      setError('Chyba při mazání šablony')
-      console.error(err)
+    } catch (err: unknown) {
+      console.error('Delete Template Error:', err);
+      if (err instanceof Error) {
+        setError(`Chyba při mazání šablony: ${err.message}`);
+      } else {
+        setError('Chyba při mazání šablony: Vyskytla se neznámá chyba.');
+      }
     }
   }
 

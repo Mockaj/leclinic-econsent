@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import { DashboardLayout } from '@/components/dashboard-layout'
@@ -35,33 +35,28 @@ export default function UsersPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    checkAdminAccess()
-    fetchUsers()
-  }, [])
-
-  const checkAdminAccess = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+  const checkAdminAccess = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      router.push('/login')
-      return
+      router.push('/login');
+      return;
     }
 
     // Check if user is admin
-    const isUserAdmin = user.email?.includes('admin') || user.user_metadata?.role === 'admin'
+    const isUserAdmin = user.email?.includes('admin') || user.user_metadata?.role === 'admin';
     if (!isUserAdmin) {
-      router.push('/dashboard')
-      return
+      router.push('/dashboard');
+      return;
     }
-  }
+  }, [router, supabase]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       // Note: In a real implementation, you'd need to use Supabase Admin API
       // or create a server-side API endpoint to list users
       // For now, we'll show a placeholder implementation
       
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         // Mock data for demonstration
         setUsers([
@@ -69,15 +64,22 @@ export default function UsersPage() {
             ...user,
             role: 'admin'
           }
-        ])
+        ]);
       }
     } catch (err) {
-      setError('Chyba při načítání uživatelů')
-      console.error(err)
+      setError('Chyba při načítání uživatelů');
+      console.error(err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  }, [supabase]);
+
+  useEffect(() => {
+    checkAdminAccess();
+    fetchUsers();
+  }, [checkAdminAccess, fetchUsers]);
+
+
 
   const handleCreateUser = async () => {
     if (!email.trim() || !password.trim()) {
@@ -103,7 +105,7 @@ export default function UsersPage() {
       // or create a server-side API endpoint to create users
       // This is just a placeholder implementation
       
-      const { data, error } = await supabase.auth.signUp({
+      const { data: _data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
         options: {
@@ -123,8 +125,12 @@ export default function UsersPage() {
       setShowCreateDialog(false)
       
       await fetchUsers()
-    } catch (err: any) {
-      setError(err.message || 'Chyba při vytváření uživatele')
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Chyba při vytváření uživatele');
+      }
     } finally {
       setCreating(false)
     }

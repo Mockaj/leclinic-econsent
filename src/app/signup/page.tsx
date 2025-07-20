@@ -54,7 +54,7 @@ export default function SignupPage() {
       } else {
         setSuccess(true)
       }
-    } catch (err) {
+    } catch (err: unknown) {
       setError('Došlo k neočekávané chybě')
     } finally {
       setLoading(false)

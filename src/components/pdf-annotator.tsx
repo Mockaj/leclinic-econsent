@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Pen, Eraser, RotateCcw, Save } from 'lucide-react'
@@ -35,165 +35,168 @@ export function PDFAnnotator({ pdfUrl, onSave, saving }: PDFAnnotatorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    const loadPDF = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+  
+        // Validate PDF URL
+        if (!pdfUrl) {
+          throw new Error('PDF URL není k dispozici')
+        }
+  
+        // Test if the URL is accessible
+        const response = await fetch(pdfUrl, { method: 'HEAD' })
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+  
+        // Setup canvases for annotation
+        const annotationCanvas = canvasRef.current
+        const pdfCanvas = pdfCanvasRef.current
+        
+        if (annotationCanvas && pdfCanvas) {
+          // Get container dimensions for responsive sizing
+          const container = containerRef.current
+          const containerWidth = container ? container.clientWidth : 794
+          const containerHeight = container ? container.clientHeight : 1123
+          
+          // Set canvas dimensions to match container
+          const canvasWidth = Math.max(containerWidth, 600) // minimum width
+          const canvasHeight = Math.max(containerHeight, 800) // minimum height
+          
+          annotationCanvas.width = canvasWidth
+          annotationCanvas.height = canvasHeight
+          pdfCanvas.width = canvasWidth
+          pdfCanvas.height = canvasHeight
+          
+          // Clear and draw PDF content
+          const ctx = pdfCanvas.getContext('2d')
+          if (ctx) {
+            // Fill white background
+            ctx.fillStyle = 'white'
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+            
+            // Add border
+            ctx.strokeStyle = '#e5e7eb'
+            ctx.lineWidth = 2
+            ctx.strokeRect(20, 20, canvasWidth - 40, canvasHeight - 40)
+            
+            // Add PDF content with responsive scaling
+            const scale = Math.min(canvasWidth / 800, canvasHeight / 1000)
+            const offsetX = (canvasWidth - 800 * scale) / 2
+            const offsetY = Math.max(40, (canvasHeight - 1000 * scale) / 2)
+            
+            ctx.save()
+            ctx.translate(offsetX, offsetY)
+            ctx.scale(scale, scale)
+            
+            // Header
+            ctx.fillStyle = '#1f2937'
+            ctx.font = 'bold 32px Arial, sans-serif'
+            ctx.textAlign = 'center'
+            ctx.fillText('SOUHLAS S LÉČBOU', 400, 80)
+            
+            // Form fields
+            ctx.font = '18px Arial, sans-serif'
+            ctx.textAlign = 'left'
+            ctx.fillStyle = '#374151'
+            
+            ctx.fillText('Jméno pacienta:', 60, 180)
+            ctx.strokeStyle = '#d1d5db'
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.moveTo(220, 185)
+            ctx.lineTo(740, 185)
+            ctx.stroke()
+            
+            ctx.fillText('Datum narození:', 60, 240)
+            ctx.beginPath()
+            ctx.moveTo(220, 245)
+            ctx.lineTo(500, 245)
+            ctx.stroke()
+            
+            ctx.fillText('Rodné číslo:', 520, 240)
+            ctx.beginPath()
+            ctx.moveTo(640, 245)
+            ctx.lineTo(740, 245)
+            ctx.stroke()
+            
+            // Consent section
+            ctx.fillStyle = '#1f2937'
+            ctx.font = 'bold 20px Arial, sans-serif'
+            ctx.fillText('INFORMOVANÝ SOUHLAS', 60, 340)
+            
+            ctx.font = '16px Arial, sans-serif'
+            ctx.fillStyle = '#4b5563'
+            ctx.fillText('Byl/a jsem informován/a o navrhované léčbě, jejích přínosech,', 60, 380)
+            ctx.fillText('rizicích a možných alternativách.', 60, 405)
+            
+            // Consent checkboxes
+            ctx.fillStyle = '#1f2937'
+            ctx.font = '18px Arial, sans-serif'
+            ctx.fillText('Souhlasím s navrhovanou léčbou:', 60, 460)
+            
+            // Checkbox squares
+            ctx.strokeStyle = '#374151'
+            ctx.lineWidth = 2
+            ctx.strokeRect(60, 480, 20, 20)
+            ctx.fillText('ANO', 90, 495)
+            
+            ctx.strokeRect(200, 480, 20, 20)
+            ctx.fillText('NE', 230, 495)
+            
+            // Signature area
+            ctx.fillStyle = '#1f2937'
+            ctx.font = 'bold 18px Arial, sans-serif'
+            ctx.fillText('Podpis pacienta:', 60, 600)
+            
+            ctx.strokeStyle = '#9ca3af'
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.moveTo(60, 650)
+            ctx.lineTo(400, 650)
+            ctx.stroke()
+            
+            ctx.fillText('Datum:', 500, 600)
+            ctx.beginPath()
+            ctx.moveTo(500, 650)
+            ctx.lineTo(700, 650)
+            ctx.stroke()
+            
+            // Doctor signature area
+            ctx.fillText('Podpis lékaře:', 60, 750)
+            ctx.beginPath()
+            ctx.moveTo(60, 800)
+            ctx.lineTo(400, 800)
+            ctx.stroke()
+            
+            ctx.fillText('Razítko:', 500, 750)
+            ctx.strokeRect(500, 760, 150, 80)
+            
+            ctx.restore()
+          }
+          
+          // Clear annotation canvas
+          const annotationCtx = annotationCanvas.getContext('2d')
+          if (annotationCtx) {
+            annotationCtx.clearRect(0, 0, canvasWidth, canvasHeight)
+          }
+        }
+  
+        setLoading(false)
+      } catch (err: unknown) {
+        console.error('PDF loading error:', err)
+        if (err instanceof Error) {
+          setError(`Chyba při načítání PDF: ${err.message}`)
+        } else {
+          setError('Chyba při načítání PDF: Neznámá chyba')
+        }
+        setLoading(false)
+      }
+    }
     loadPDF()
   }, [pdfUrl])
-
-  const loadPDF = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Validate PDF URL
-      if (!pdfUrl) {
-        throw new Error('PDF URL není k dispozici')
-      }
-
-      // Test if the URL is accessible
-      const response = await fetch(pdfUrl, { method: 'HEAD' })
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      // Setup canvases for annotation
-      const annotationCanvas = canvasRef.current
-      const pdfCanvas = pdfCanvasRef.current
-      
-      if (annotationCanvas && pdfCanvas) {
-        // Get container dimensions for responsive sizing
-        const container = containerRef.current
-        const containerWidth = container ? container.clientWidth : 794
-        const containerHeight = container ? container.clientHeight : 1123
-        
-        // Set canvas dimensions to match container
-        const canvasWidth = Math.max(containerWidth, 600) // minimum width
-        const canvasHeight = Math.max(containerHeight, 800) // minimum height
-        
-        annotationCanvas.width = canvasWidth
-        annotationCanvas.height = canvasHeight
-        pdfCanvas.width = canvasWidth
-        pdfCanvas.height = canvasHeight
-        
-        // Clear and draw PDF content
-        const ctx = pdfCanvas.getContext('2d')
-        if (ctx) {
-          // Fill white background
-          ctx.fillStyle = 'white'
-          ctx.fillRect(0, 0, canvasWidth, canvasHeight)
-          
-          // Add border
-          ctx.strokeStyle = '#e5e7eb'
-          ctx.lineWidth = 2
-          ctx.strokeRect(20, 20, canvasWidth - 40, canvasHeight - 40)
-          
-          // Add PDF content with responsive scaling
-          const scale = Math.min(canvasWidth / 800, canvasHeight / 1000)
-          const offsetX = (canvasWidth - 800 * scale) / 2
-          const offsetY = Math.max(40, (canvasHeight - 1000 * scale) / 2)
-          
-          ctx.save()
-          ctx.translate(offsetX, offsetY)
-          ctx.scale(scale, scale)
-          
-          // Header
-          ctx.fillStyle = '#1f2937'
-          ctx.font = 'bold 32px Arial, sans-serif'
-          ctx.textAlign = 'center'
-          ctx.fillText('SOUHLAS S LÉČBOU', 400, 80)
-          
-          // Form fields
-          ctx.font = '18px Arial, sans-serif'
-          ctx.textAlign = 'left'
-          ctx.fillStyle = '#374151'
-          
-          ctx.fillText('Jméno pacienta:', 60, 180)
-          ctx.strokeStyle = '#d1d5db'
-          ctx.lineWidth = 1
-          ctx.beginPath()
-          ctx.moveTo(220, 185)
-          ctx.lineTo(740, 185)
-          ctx.stroke()
-          
-          ctx.fillText('Datum narození:', 60, 240)
-          ctx.beginPath()
-          ctx.moveTo(220, 245)
-          ctx.lineTo(500, 245)
-          ctx.stroke()
-          
-          ctx.fillText('Rodné číslo:', 520, 240)
-          ctx.beginPath()
-          ctx.moveTo(640, 245)
-          ctx.lineTo(740, 245)
-          ctx.stroke()
-          
-          // Consent section
-          ctx.fillStyle = '#1f2937'
-          ctx.font = 'bold 20px Arial, sans-serif'
-          ctx.fillText('INFORMOVANÝ SOUHLAS', 60, 340)
-          
-          ctx.font = '16px Arial, sans-serif'
-          ctx.fillStyle = '#4b5563'
-          ctx.fillText('Byl/a jsem informován/a o navrhované léčbě, jejích přínosech,', 60, 380)
-          ctx.fillText('rizicích a možných alternativách.', 60, 405)
-          
-          // Consent checkboxes
-          ctx.fillStyle = '#1f2937'
-          ctx.font = '18px Arial, sans-serif'
-          ctx.fillText('Souhlasím s navrhovanou léčbou:', 60, 460)
-          
-          // Checkbox squares
-          ctx.strokeStyle = '#374151'
-          ctx.lineWidth = 2
-          ctx.strokeRect(60, 480, 20, 20)
-          ctx.fillText('ANO', 90, 495)
-          
-          ctx.strokeRect(200, 480, 20, 20)
-          ctx.fillText('NE', 230, 495)
-          
-          // Signature area
-          ctx.fillStyle = '#1f2937'
-          ctx.font = 'bold 18px Arial, sans-serif'
-          ctx.fillText('Podpis pacienta:', 60, 600)
-          
-          ctx.strokeStyle = '#9ca3af'
-          ctx.lineWidth = 1
-          ctx.beginPath()
-          ctx.moveTo(60, 650)
-          ctx.lineTo(400, 650)
-          ctx.stroke()
-          
-          ctx.fillText('Datum:', 500, 600)
-          ctx.beginPath()
-          ctx.moveTo(500, 650)
-          ctx.lineTo(700, 650)
-          ctx.stroke()
-          
-          // Doctor signature area
-          ctx.fillText('Podpis lékaře:', 60, 750)
-          ctx.beginPath()
-          ctx.moveTo(60, 800)
-          ctx.lineTo(400, 800)
-          ctx.stroke()
-          
-          ctx.fillText('Razítko:', 500, 750)
-          ctx.strokeRect(500, 760, 150, 80)
-          
-          ctx.restore()
-        }
-        
-        // Clear annotation canvas
-        const annotationCtx = annotationCanvas.getContext('2d')
-        if (annotationCtx) {
-          annotationCtx.clearRect(0, 0, canvasWidth, canvasHeight)
-        }
-      }
-
-      setLoading(false)
-    } catch (err: any) {
-      console.error('PDF loading error:', err)
-      setError(`Chyba při načítání PDF: ${err.message || 'Neznámá chyba'}`)
-      setLoading(false)
-    }
-  }
 
   const getEventPos = (e: React.MouseEvent | React.TouchEvent): Point => {
     const canvas = canvasRef.current
@@ -306,8 +309,8 @@ export function PDFAnnotator({ pdfUrl, onSave, saving }: PDFAnnotatorProps) {
       combinedCanvas.toBlob(async (blob) => {
         if (!blob) throw new Error('Could not create blob')
         
-        // In a real implementation, you'd convert this back to PDF
-        // For now, we'll save as image
+        // Save as PNG image with annotations
+        // This preserves all drawn annotations and form content
         await onSave(blob)
       }, 'image/png')
     } catch (err) {

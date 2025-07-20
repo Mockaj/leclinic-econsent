@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,11 +31,8 @@ export function CompletedConsentsTab() {
   const [downloading, setDownloading] = useState<string | null>(null)
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchConsents()
-  }, [sortBy])
-
-  const fetchConsents = async () => {
+  const fetchConsents = useCallback(async () => {
+    setLoading(true);
     try {
       let query = supabase
         .from('completed_consents')
@@ -44,35 +41,39 @@ export function CompletedConsentsTab() {
           templates (
             name
           )
-        `)
+        `);
 
       // Apply sorting
       switch (sortBy) {
         case 'date-desc':
-          query = query.order('completed_at', { ascending: false, nullsFirst: false })
-          break
+          query = query.order('completed_at', { ascending: false, nullsFirst: false });
+          break;
         case 'date-asc':
-          query = query.order('completed_at', { ascending: true, nullsFirst: true })
-          break
+          query = query.order('completed_at', { ascending: true, nullsFirst: true });
+          break;
         case 'name-asc':
-          query = query.order('name', { ascending: true })
-          break
+          query = query.order('name', { ascending: true });
+          break;
         case 'name-desc':
-          query = query.order('name', { ascending: false })
-          break
+          query = query.order('name', { ascending: false });
+          break;
       }
 
-      const { data, error } = await query
+      const { data, error } = await query;
 
-      if (error) throw error
-      setConsents(data || [])
-    } catch (err) {
-      setError('Chyba při načítání souhlasů')
-      console.error(err)
+      if (error) throw error;
+      setConsents(data || []);
+    } catch (err: unknown) {
+      setError('Chyba při načítání souhlasů');
+      console.error(err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  }, [sortBy, supabase]);
+
+  useEffect(() => {
+    fetchConsents();
+  }, [fetchConsents]);
 
   const handleEditConsent = async () => {
     if (!editingConsent || !editName.trim()) return
@@ -88,7 +89,7 @@ export function CompletedConsentsTab() {
       await fetchConsents()
       setEditingConsent(null)
       setEditName('')
-    } catch (err) {
+    } catch (err: unknown) {
       setError('Chyba při úpravě souhlasu')
       console.error(err)
     }
@@ -119,7 +120,7 @@ export function CompletedConsentsTab() {
 
       await fetchConsents()
       setDeleteConsent(null)
-    } catch (err) {
+    } catch (err: unknown) {
       setError('Chyba při mazání souhlasu')
       console.error(err)
     }
@@ -143,12 +144,14 @@ export function CompletedConsentsTab() {
       const url = URL.createObjectURL(data)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${consent.name}.pdf`
+      // Determine file extension based on file path
+      const fileExtension = consent.file_path?.endsWith('.png') ? '.png' : '.pdf'
+      a.download = `${consent.name}${fileExtension}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-    } catch (err) {
+    } catch (err: unknown) {
       setError('Chyba při stahování souboru')
       console.error(err)
     } finally {
