@@ -321,7 +321,8 @@ export function CompletedConsentsTab() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex gap-2">
+        </div>
+        <div className="flex gap-2">
             <Button
               onClick={handleDownloadSelected}
               disabled={selectedConsents.length === 0 || isDownloadingZip}
@@ -329,7 +330,7 @@ export function CompletedConsentsTab() {
               {isDownloadingZip ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Package className="mr-2 h-4 w-4" />
+                <Download className="mr-2 h-4 w-4" />
               )}
               Stáhnout vybrané ({selectedConsents.length})
             </Button>
@@ -345,7 +346,6 @@ export function CompletedConsentsTab() {
               )}
               Smazat vybrané ({selectedConsents.length})
             </Button>
-          </div>
         </div>
       </div>
 

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Copy, Check } from 'lucide-react'
+import { Loader2, ExternalLink } from 'lucide-react'
 import { Database } from '@/lib/supabase'
 import { v4 as uuidv4 } from 'uuid'
 import { useEffect, useRef } from 'react'
@@ -27,7 +27,7 @@ export function QRCodeModal({ template, onClose, onSuccess }: QRCodeModalProps) 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState('')
-  const [copied, setCopied] = useState(false)
+
   const supabase = createClient()
 
   const generateQRCode = async () => {
@@ -79,14 +79,8 @@ export function QRCodeModal({ template, onClose, onSuccess }: QRCodeModalProps) 
     }
   }
 
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(qrUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy:', err)
-    }
+  const openInNewTab = () => {
+    window.open(qrUrl, '_blank')
   }
 
   const handleClose = () => {
@@ -94,7 +88,7 @@ export function QRCodeModal({ template, onClose, onSuccess }: QRCodeModalProps) 
     setConsentName('')
     setQrUrl('')
     setError(null)
-    setCopied(false)
+
     onClose()
   }
 
@@ -157,21 +151,16 @@ export function QRCodeModal({ template, onClose, onSuccess }: QRCodeModalProps) 
               
               <div className="text-center">
                 <p className="text-sm text-muted-foreground mb-2">
-                  Nebo použijte odkaz přímo:
+                  Nebo otevřete odkaz přímo:
                 </p>
-                <div className="flex items-center gap-2">
-                  <div className="bg-muted p-2 rounded text-xs font-mono break-all flex-1">
-                    {qrUrl}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={copyToClipboard}
-                    className="shrink-0"
-                  >
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  </Button>
-                </div>
+                <Button
+                  onClick={openInNewTab}
+                  className="w-full"
+                  variant="outline"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Otevřít v novém okně
+                </Button>
               </div>
               
               <Alert>
