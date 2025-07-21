@@ -13,6 +13,7 @@ export type Database = {
           id: string
           name: string
           file_path: string
+          image_path: string | null
           page_count: number
           uploaded_at: string
           updated_at: string
@@ -22,6 +23,7 @@ export type Database = {
           id?: string
           name: string
           file_path: string
+          image_path?: string | null
           page_count: number
           uploaded_at?: string
           updated_at?: string
@@ -31,6 +33,7 @@ export type Database = {
           id?: string
           name?: string
           file_path?: string
+          image_path?: string | null
           page_count?: number
           uploaded_at?: string
           updated_at?: string

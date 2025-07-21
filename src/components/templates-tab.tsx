@@ -67,7 +67,7 @@ export function TemplatesTab() {
           continue
         }
 
-        // Upload file to storage
+        // Upload PDF to storage
         const fileExt = 'pdf'
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
         const filePath = `templates/${fileName}`
@@ -78,8 +78,60 @@ export function TemplatesTab() {
 
         if (uploadError) throw uploadError
 
-        // Get page count (simplified - in real app you'd use a PDF library)
-        const pageCount = 1 // TODO: Implement actual page counting
+        // Convert PDF to image (client-side only)
+        let imagePath: string | null = null
+        if (typeof window !== 'undefined') {
+          try {
+            // Dynamic import of pdfjs-dist to avoid SSR issues
+            const pdfjsLib = await import('pdfjs-dist')
+            
+            // Setup worker
+            pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+            
+            const arrayBuffer = await file.arrayBuffer()
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise
+            const page = await pdf.getPage(1)
+            
+            // Get desired width and height
+            const viewport = page.getViewport({ scale: 2.0 })
+            
+            // Create canvas
+            const canvas = document.createElement('canvas')
+            const ctx = canvas.getContext('2d')!
+            canvas.width = viewport.width
+            canvas.height = viewport.height
+            
+            // Render PDF page to canvas
+            await page.render({ canvasContext: ctx, viewport }).promise
+            
+            // Convert to PNG blob
+            const pngBlob = await new Promise<Blob>((resolve, reject) => {
+              canvas.toBlob((blob) => {
+                if (blob) resolve(blob)
+                else reject(new Error('Failed to create PNG blob'))
+              }, 'image/png')
+            })
+            
+            // Upload PNG to storage
+            const imageFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.png`
+            imagePath = `images/${imageFileName}`
+            
+            const { error: imageUploadError } = await supabase.storage
+              .from('consent-templates')
+              .upload(imagePath, pngBlob, { contentType: 'image/png' })
+              
+            if (imageUploadError) {
+              console.warn('Failed to upload image:', imageUploadError)
+              imagePath = null
+            }
+          } catch (err) {
+            console.warn('Failed to convert PDF to image:', err)
+            imagePath = null
+          }
+        }
+
+        // Get page count
+        const pageCount = 1
 
         // Create template record
         const { error: insertError } = await supabase
@@ -87,6 +139,7 @@ export function TemplatesTab() {
           .insert({
             name: file.name.replace('.pdf', ''),
             file_path: filePath,
+            image_path: imagePath,
             page_count: pageCount,
             uploaded_by: user.id
           })
@@ -97,10 +150,14 @@ export function TemplatesTab() {
       await fetchTemplates()
     } catch (err: unknown) {
       console.error('File Upload Error:', err);
+      console.error('Error details:', JSON.stringify(err, null, 2));
       if (err instanceof Error) {
+        console.error('Error message:', err.message);
+        console.error('Error stack:', err.stack);
         setError(`Chyba při nahrávání souboru: ${err.message}`);
       } else {
-        setError('Chyba při nahrávání souboru: Vyskytla se neznámá chyba.');
+        console.error('Non-Error thrown:', typeof err, err);
+        setError(`Chyba při nahrávání souboru: ${JSON.stringify(err)}`);
       }
     } finally {
       setUploading(false)
@@ -137,12 +194,20 @@ export function TemplatesTab() {
     if (!deleteTemplate) return
 
     try {
-      // Delete file from storage
+      // Delete files from storage (both PDF and PNG)
+      const filesToDelete = [deleteTemplate.file_path]
+      if (deleteTemplate.image_path) {
+        filesToDelete.push(deleteTemplate.image_path)
+      }
+      
       const { error: storageError } = await supabase.storage
         .from('consent-templates')
-        .remove([deleteTemplate.file_path])
+        .remove(filesToDelete)
 
-      if (storageError) throw storageError
+      if (storageError) {
+        console.warn('Storage deletion error:', storageError)
+        // Don't throw here, continue with database deletion
+      }
 
       // Delete template record
       const { error: dbError } = await supabase

@@ -6,13 +6,14 @@ import { createClient } from '@/lib/supabase-client'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, ArrowLeft, CheckCircle } from 'lucide-react'
-import { PDFAnnotator } from '@/components/pdf-annotator'
+import { ImageAnnotator } from '@/components/image-annotator'
 import { Database } from '@/lib/supabase'
 
 type ConsentRecord = Database['public']['Tables']['completed_consents']['Row'] & {
   templates: {
     name: string
     file_path: string
+    image_path: string | null
   } | null
 }
 
@@ -24,7 +25,7 @@ export default function ConsentEditPage() {
   const [consent, setConsent] = useState<ConsentRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const supabase = createClient()
@@ -38,7 +39,8 @@ export default function ConsentEditPage() {
           *,
           templates (
             name,
-            file_path
+            file_path,
+            image_path
           )
         `)
         .eq('id', consentId)
@@ -54,13 +56,13 @@ export default function ConsentEditPage() {
 
       setConsent(consentData as ConsentRecord)
 
-      // Get the original template PDF URL
-      if (consentData.templates?.file_path) {
+      // Get the original template image URL
+      if (consentData.templates?.image_path) {
         const { data: urlData } = supabase.storage
-          .from('templates')
-          .getPublicUrl(consentData.templates.file_path)
+          .from('consent-templates')
+          .getPublicUrl(consentData.templates.image_path)
         
-        setPdfUrl(urlData.publicUrl)
+        setImageUrl(urlData.publicUrl)
       }
     } catch (err: any) {
       setError(err.message)
@@ -166,11 +168,11 @@ export default function ConsentEditPage() {
     )
   }
 
-  if (!consent || !pdfUrl) {
+  if (!consent || !imageUrl) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Alert variant="destructive">
-          <AlertDescription>Formulář nebo PDF soubor nebyl nalezen.</AlertDescription>
+          <AlertDescription>Formulář nebo obrázek nebyl nalezen.</AlertDescription>
         </Alert>
       </div>
     )
@@ -200,8 +202,8 @@ export default function ConsentEditPage() {
         )}
       </div>
 
-      <PDFAnnotator
-        pdfUrl={pdfUrl}
+      <ImageAnnotator
+        imageUrl={imageUrl}
         onSave={handleSaveForm}
         saving={saving}
       />

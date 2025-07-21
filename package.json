@@ -43,6 +43,7 @@
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.52.0",
     "@types/jszip": "^3.4.0",
+    "@types/pdfjs-dist": "^2.10.377",
     "@types/qrcode": "^1.5.5",
     "@types/qrcode.react": "^1.0.5",
     "@types/uuid": "^10.0.0",

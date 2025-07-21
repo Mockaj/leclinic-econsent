@@ -6,13 +6,14 @@ import { createClient } from '@/lib/supabase-client'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
-import { PDFAnnotator } from '@/components/pdf-annotator'
+import { ImageAnnotator } from '@/components/image-annotator'
 import { Database } from '@/lib/supabase'
 
 type ConsentRecord = Database['public']['Tables']['completed_consents']['Row'] & {
   templates: {
     name: string
     file_path: string
+    image_path: string | null
   } | null
 }
 
@@ -23,7 +24,7 @@ export default function ConsentFillPage() {
   const [consent, setConsent] = useState<ConsentRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [completed, setCompleted] = useState(false)
   const supabase = createClient()
@@ -38,7 +39,8 @@ export default function ConsentFillPage() {
           *,
           templates (
             name,
-            file_path
+            file_path,
+            image_path
           )
         `)
         .eq('auth_token', token)
@@ -64,13 +66,25 @@ export default function ConsentFillPage() {
 
       setConsent(consentData as ConsentRecord);
 
-      // Get public URL for the template file
-      if (consentData.templates?.file_path) {
+      // Get public URL for the template image
+      console.log('ConsentFillPage: Template data:', consentData.templates)
+      if (consentData.templates?.image_path) {
+        console.log('ConsentFillPage: Found image_path:', consentData.templates.image_path)
         const { data: urlData } = supabase.storage
-          .from('templates')
-          .getPublicUrl(consentData.templates.file_path);
+          .from('consent-templates')
+          .getPublicUrl(consentData.templates.image_path);
         
-        setPdfUrl(urlData.publicUrl);
+        console.log('ConsentFillPage: Got public URL:', urlData.publicUrl)
+        setImageUrl(urlData.publicUrl);
+      } else {
+        console.log('ConsentFillPage: No image_path found, falling back to file_path if available')
+        if (consentData.templates?.file_path) {
+          console.log('ConsentFillPage: Using file_path as fallback:', consentData.templates.file_path)
+          const { data: urlData } = supabase.storage
+            .from('consent-templates')
+            .getPublicUrl(consentData.templates.file_path);
+          setImageUrl(urlData.publicUrl);
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -165,7 +179,7 @@ export default function ConsentFillPage() {
     )
   }
 
-  if (!pdfUrl || !consent) {
+  if (!imageUrl || !consent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -194,8 +208,8 @@ export default function ConsentFillPage() {
       </div>
 
       <div className="container mx-auto p-4">
-        <PDFAnnotator
-          pdfUrl={pdfUrl}
+        <ImageAnnotator
+          imageUrl={imageUrl}
           onSave={handleSaveForm}
           saving={saving}
         />
