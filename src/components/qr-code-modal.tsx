@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Copy, Check } from 'lucide-react'
 import { Database } from '@/lib/supabase'
 import { v4 as uuidv4 } from 'uuid'
 import { useEffect, useRef } from 'react'
@@ -27,6 +27,7 @@ export function QRCodeModal({ template, onClose, onSuccess }: QRCodeModalProps) 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState('')
+  const [copied, setCopied] = useState(false)
   const supabase = createClient()
 
   const generateQRCode = async () => {
@@ -78,11 +79,22 @@ export function QRCodeModal({ template, onClose, onSuccess }: QRCodeModalProps) 
     }
   }
 
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(qrUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
   const handleClose = () => {
     setStep('name')
     setConsentName('')
     setQrUrl('')
     setError(null)
+    setCopied(false)
     onClose()
   }
 
@@ -147,8 +159,18 @@ export function QRCodeModal({ template, onClose, onSuccess }: QRCodeModalProps) 
                 <p className="text-sm text-muted-foreground mb-2">
                   Nebo použijte odkaz přímo:
                 </p>
-                <div className="bg-muted p-2 rounded text-xs font-mono break-all">
-                  {qrUrl}
+                <div className="flex items-center gap-2">
+                  <div className="bg-muted p-2 rounded text-xs font-mono break-all flex-1">
+                    {qrUrl}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyToClipboard}
+                    className="shrink-0"
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
                 </div>
               </div>
               

@@ -45,10 +45,20 @@ export function PDFAnnotator({ pdfUrl, onSave, saving }: PDFAnnotatorProps) {
           throw new Error('PDF URL není k dispozici')
         }
   
-        // Test if the URL is accessible
-        const response = await fetch(pdfUrl, { method: 'HEAD' })
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        // Test if the URL is accessible with a simple GET request
+        // Skip URL validation for Supabase storage URLs as they may require specific headers
+        try {
+          const response = await fetch(pdfUrl, { 
+            method: 'HEAD',
+            mode: 'cors'
+          })
+          // Don't throw error immediately for 400/403 as Supabase storage may still work
+          if (!response.ok && response.status !== 400 && response.status !== 403) {
+            console.warn(`PDF URL returned ${response.status}: ${response.statusText}, proceeding anyway`)
+          }
+        } catch (fetchError) {
+          console.warn('PDF URL validation failed, proceeding anyway:', fetchError)
+          // Continue execution as the URL might still work for PDF display
         }
   
         // Setup canvases for annotation

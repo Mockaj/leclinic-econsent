@@ -10,9 +10,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Edit, Trash2, Download, Loader2, FileText, ArrowUpDown, Package } from 'lucide-react'
+import { Edit, Trash2, Download, Loader2, FileText, ArrowUpDown, Package, PenTool } from 'lucide-react'
 import { Database } from '@/lib/supabase'
 import JSZip from 'jszip'
+import { useRouter } from 'next/navigation'
 
 type CompletedConsent = Database['public']['Tables']['completed_consents']['Row'] & {
   templates: {
@@ -34,6 +35,7 @@ export function CompletedConsentsTab() {
   const [selectedConsents, setSelectedConsents] = useState<string[]>([])
   const [isDownloadingZip, setIsDownloadingZip] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
 
   const fetchConsents = useCallback(async () => {
     setLoading(true);
@@ -352,8 +354,18 @@ export function CompletedConsentsTab() {
                         }}
                       >
                         <Edit className="mr-2 h-4 w-4" />
-                        Upravit
+                        Přejmenovat
                       </Button>
+                      {(consent.status === 'completed' || consent.status === 'pending') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/consent-edit/${consent.id}`)}
+                        >
+                          <PenTool className="mr-2 h-4 w-4" />
+                          Upravit PDF
+                        </Button>
+                      )}
                       <Button
                         variant="destructive"
                         size="sm"
