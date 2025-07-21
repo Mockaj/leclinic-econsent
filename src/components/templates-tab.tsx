@@ -238,7 +238,7 @@ export function TemplatesTab() {
                 <TableHead>Počet stran</TableHead>
                 <TableHead>Datum přidání</TableHead>
                 <TableHead>Naposledy upraveno</TableHead>
-                <TableHead className="text-right">Akce</TableHead>
+                <TableHead className="text-left">Akce</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -248,17 +248,18 @@ export function TemplatesTab() {
                   <TableCell>{template.page_count}</TableCell>
                   <TableCell>{formatDate(template.uploaded_at)}</TableCell>
                   <TableCell>{formatDate(template.updated_at)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                  <TableCell className="text-left">
+                    <div className="flex justify-start gap-2">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => setQrTemplate(template)}
                       >
                         <QrCode className="h-4 w-4" />
+                        QR
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => {
                           setEditingTemplate(template)
@@ -266,13 +267,15 @@ export function TemplatesTab() {
                         }}
                       >
                         <Edit className="h-4 w-4" />
+                        Přejmenovat
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="destructive"
                         size="sm"
                         onClick={() => setDeleteTemplate(template)}
                       >
                         <Trash2 className="h-4 w-4" />
+                        Smazat
                       </Button>
                     </div>
                   </TableCell>

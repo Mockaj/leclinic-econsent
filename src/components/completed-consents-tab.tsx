@@ -34,6 +34,8 @@ export function CompletedConsentsTab() {
   const [downloading, setDownloading] = useState<string | null>(null)
   const [selectedConsents, setSelectedConsents] = useState<string[]>([])
   const [isDownloadingZip, setIsDownloadingZip] = useState(false)
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -251,6 +253,48 @@ export function CompletedConsentsTab() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedConsents.length === 0) return
+
+    setIsBulkDeleting(true)
+    try {
+      // Delete files from storage first
+      for (const consentId of selectedConsents) {
+        const consent = consents.find(c => c.id === consentId)
+        if (consent?.file_path) {
+          try {
+            await supabase.storage
+              .from('completed-consents')
+              .remove([consent.file_path])
+          } catch (storageError) {
+            console.warn(`Failed to delete file for consent ${consent.id}:`, storageError)
+            // Continue with database deletion even if file deletion fails
+          }
+        }
+      }
+
+      // Delete records from database
+      const { error: deleteError } = await supabase
+        .from('completed_consents')
+        .delete()
+        .in('id', selectedConsents)
+
+      if (deleteError) throw deleteError
+
+      // Update local state
+      setConsents(prevConsents => 
+        prevConsents.filter(consent => !selectedConsents.includes(consent.id))
+      )
+      setSelectedConsents([])
+      setBulkDeleteDialogOpen(false)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Chyba při mazání souhlasů')
+      console.error(err)
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -277,17 +321,31 @@ export function CompletedConsentsTab() {
               </SelectContent>
             </Select>
           </div>
-          <Button
-            onClick={handleDownloadSelected}
-            disabled={selectedConsents.length === 0 || isDownloadingZip}
-          >
-            {isDownloadingZip ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Package className="mr-2 h-4 w-4" />
-            )}
-            Stáhnout vybrané ({selectedConsents.length})
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleDownloadSelected}
+              disabled={selectedConsents.length === 0 || isDownloadingZip}
+            >
+              {isDownloadingZip ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Package className="mr-2 h-4 w-4" />
+              )}
+              Stáhnout vybrané ({selectedConsents.length})
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setBulkDeleteDialogOpen(true)}
+              disabled={selectedConsents.length === 0 || isBulkDeleting}
+            >
+              {isBulkDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Smazat vybrané ({selectedConsents.length})
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -427,6 +485,35 @@ export function CompletedConsentsTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConsent(null)}>Zrušit</Button>
             <Button variant="destructive" onClick={handleDeleteConsent}>Smazat</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Opravdu smazat vybrané souhlasy?</DialogTitle>
+            <DialogDescription>
+              Chystáte se smazat {selectedConsents.length} souhlasů. Tato akce je nevratná a všechny vybrané souhlasy budou trvale smazány.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setBulkDeleteDialogOpen(false)}
+              disabled={isBulkDeleting}
+            >
+              Zrušit
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+            >
+              {isBulkDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Smazat všechny ({selectedConsents.length})
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
