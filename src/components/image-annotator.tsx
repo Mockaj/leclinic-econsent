@@ -244,6 +244,32 @@ export function ImageAnnotator({ imageUrl, onSave, saving }: Props) {
         console.log('ImageAnnotator: FINAL SUCCESS - Drew image on background canvas')
         setError(null)
       }
+      
+      // iPadOS Stylus Fix: Add touchmove event listener to prevent Scribble from interfering
+      // This prevents Apple's Scribble feature from stealing rapid stylus strokes
+      const handleTouchMove = (e: TouchEvent) => {
+        e.preventDefault()
+      }
+      
+      // Add the event listener to both annotation and cursor canvas
+      if (annCanvasRef.current) {
+        annCanvasRef.current.addEventListener('touchmove', handleTouchMove, { passive: false })
+        console.log('ImageAnnotator: Added iPadOS stylus fix to annotation canvas')
+      }
+      if (cursorCanvasRef.current) {
+        cursorCanvasRef.current.addEventListener('touchmove', handleTouchMove, { passive: false })
+        console.log('ImageAnnotator: Added iPadOS stylus fix to cursor canvas')
+      }
+      
+      // Cleanup function to remove event listeners
+      return () => {
+        if (annCanvasRef.current) {
+          annCanvasRef.current.removeEventListener('touchmove', handleTouchMove)
+        }
+        if (cursorCanvasRef.current) {
+          cursorCanvasRef.current.removeEventListener('touchmove', handleTouchMove)
+        }
+      }
     } else {
       console.log('ImageAnnotator: Not all conditions met:', {
         hasImage: !!loadedImage,
